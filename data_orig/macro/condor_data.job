@@ -1,0 +1,16 @@
+Universe	= vanilla
+Executable 	= /sphenix/user/abrahma/datartrk/macro/run_code_data.sh
+notification 	= Never
+Output  	= /sphenix/user/abrahma/logs/condor_$(Process).out
+Error         = /sphenix/user/abrahma/logs/condor_$(Process).err
+Log  		  = /tmp/abcondor_$(process).log
+Initialdir  	  = /sphenix/user/abrahma/datartrk/macro/
+# Jobs by default use 1.5Gb of RAM, you need to ask for more if needed
+# with request_memory. Be mindful - if you request too little your jobs will be evicted, if you request way too much it will take longer for your job to start
+request_memory = 12 GB
+# the importance of this PeriodicHold will be explained in the next section
+PeriodicHold = (NumJobStarts>=1 && JobStatus == 1)
+concurrency_limits=CONCURRENCY_LIMIT_DEFAULT:1000
+# Arguments passed to your script
+Arguments = $(Process)
+Queue 260
