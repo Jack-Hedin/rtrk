@@ -33,7 +33,7 @@ datartrk::datartrk(const std::string& recojetnameR04,
   , m_recoJetNameR04(recojetnameR04)
   , m_outputFileName(outputfilename)
   , m_etaRange(-0.7, 0.7)
-  , m_ptRange(10.0, 100.0)
+  , m_ptRange(5.0, 100.0)
   , m_verbosity(1)
   , m_embedding_id(1)
   , m_total_events(0)
@@ -55,9 +55,9 @@ datartrk::~datartrk()
 //____________________________________________________________________________..
 int datartrk::Init(PHCompositeNode*)
 {
-  
-  //PHTFileServer::get().open(m_outputFileName, "RECREATE");
-  out = new TFile(m_outputFileName.c_str(), "RECREATE");
+  std::cout << "Starting Init" << std::endl; 
+  PHTFileServer::get().open(m_outputFileName, "RECREATE");
+  //out = new TFile(m_outputFileName.c_str(), "RECREATE");
 
   //trigAna = new TriggerAnalyzer();
 
@@ -126,6 +126,7 @@ int datartrk::Init(PHCompositeNode*)
              "# of tracks vs #Sigma p_{T}^{trk};#Sigma p_{T}^{trk} [GeV/c];Number of Tracks",
              100, 0, 150, 50, 0, 50);
 
+  std::cout << "Finished" << std::endl;
   return Fun4AllReturnCodes::EVENT_OK;
 }
 //____________________________________________________________________________..
@@ -228,19 +229,27 @@ int datartrk::processRtrkAnalysis(PHCompositeNode *topNode)
   SvtxTrackMap *trackmap = findNode::getClass<SvtxTrackMap>(topNode, "SvtxTrackMap");
   RawTowerGeomContainer *geomEM = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_CEMC");
 
-  if (!jets || !trackmap || !geomEM) return Fun4AllReturnCodes::ABORTEVENT;
+  if (!jets || !trackmap || !geomEM) { std::cout << "Either jets, trackmap, or geomEM not found!" << std::endl; return Fun4AllReturnCodes::ABORTEVENT; }
 
   for (auto jet : *jets)
   {
-    if (!jet) continue;
-
+    if (!jet) {std::cout << "jet is missing" << std::endl; continue;}
+    
     float jet_pt  = jet->get_pt();
     float jet_eta = jet->get_eta();
     float jet_phi = jet->get_phi();
 
-    if (jet_eta < m_etaRange.first || jet_eta > m_etaRange.second) continue;
-    if (jet_pt  < m_ptRange.first  || jet_pt  > m_ptRange.second)  continue;
-
+    if (jet_eta < m_etaRange.first || jet_eta > m_etaRange.second) {
+      //std::cout << "Jet Eta: " << jet_eta << " is out of range "
+      //          << m_etaRange.first << "-" << m_etaRange.second << std::endl;
+      continue;
+    }
+    if (jet_pt  < m_ptRange.first  || jet_pt  > m_ptRange.second) {
+      //std::cout << "Jet Pt: " << jet_pt << " is out of range " 
+      //          << m_ptRange.first << "-" << m_ptRange.second << std::endl;
+      continue;
+    }
+    std::cout << "We found a Jet!" << std::endl;
     m_total_jets++;
 
     h_jet_eta_phi->Fill(jet_eta, jet_phi);
@@ -252,6 +261,7 @@ int datartrk::processRtrkAnalysis(PHCompositeNode *topNode)
     for (const auto& pair : *trackmap)
     {
       SvtxTrack* track = pair.second;
+      
       if (!track) continue;
       if (track->get_crossing() != 0) continue;
 
@@ -314,37 +324,43 @@ int datartrk::processRtrkAnalysis(PHCompositeNode *topNode)
 int datartrk::process_event(PHCompositeNode *topNode)
 {
   m_total_events++;
+  
+  //std::cout << "(1) Running event: " << m_total_events << std::endl;
 
-  if (!processVertex(topNode))  return Fun4AllReturnCodes::EVENT_OK;
-  if (!processTrigger(topNode)) return Fun4AllReturnCodes::EVENT_OK;
+  if (!processVertex(topNode)) {
+    std::cout << "ERROR: processVertex is false" << std::endl; 
+    return Fun4AllReturnCodes::EVENT_OK;
+  }
+  if (!processTrigger(topNode)) {
+    std::cout << "ERROR: processTrigger is false" << std::endl;
+    return Fun4AllReturnCodes::EVENT_OK;
+  }
 
+  std::cout << "(2) Running event: " << m_total_events << std::endl;
+  
   return processRtrkAnalysis(topNode);
 }
 
 //____________________________________________________________________________..
 int datartrk::End(PHCompositeNode*)
 {
-  //TFile fout(m_outputFileName.c_str(), "RECREATE");
-
-  out->cd();
-  //------
-    h_rtrk_vs_jet_pt_emcal->Write();
-    h_nMatchedTracks_emcal->Write();
-    h_deltaR_emcal_jet_track->Write();
-    h_deta_emcal_jet_track->Write();
-    h_dphi_emcal_jet_track->Write();
-    h_track_eta_phi_emcal->Write();
-    h_jet_eta_phi->Write();
-    h_zvtx_all->Write();
-    h_zvtx_cut->Write();
-    h_jet_pt->Write();
-    h_track_pt->Write();
-    h_sumtrkpt_vs_jetpt->Write();
-    h_nTracks_vs_sumPtTracks->Write();
-  //------
-  out->Write();
-  out->Close();
-  delete out;
+  TFile fout(m_outputFileName.c_str(), "RECREATE");
+  
+  h_rtrk_vs_jet_pt_emcal->Write();
+  h_nMatchedTracks_emcal->Write();
+  h_deltaR_emcal_jet_track->Write();
+  h_deta_emcal_jet_track->Write();
+  h_dphi_emcal_jet_track->Write();
+  h_track_eta_phi_emcal->Write();
+  h_jet_eta_phi->Write();
+  h_zvtx_all->Write();
+  h_zvtx_cut->Write();
+  h_jet_pt->Write();
+  h_track_pt->Write();
+  h_sumtrkpt_vs_jetpt->Write();
+  h_nTracks_vs_sumPtTracks->Write();
+  
+  fout.Close();
 
   cout << "datartrk finished\n"
        << "  Events: " << m_total_events << "\n"

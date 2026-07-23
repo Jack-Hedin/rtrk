@@ -54,7 +54,7 @@ class datartrk : public SubsysReco
 
   //TriggerAnalyzer* trigAna;
 
-  TFile *out{nullptr};
+  
   TH2F *h_rtrk_vs_jet_pt_emcal;
   TH1F *h_nMatchedTracks_emcal;
   TH2F *h_jet_eta_phi;

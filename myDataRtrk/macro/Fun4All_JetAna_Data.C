@@ -5,7 +5,6 @@
 // _______________________________________________________________________________________________________________________________________
 // ---------------------------------------------------------------------------------------------------------------------------------------
 // =======================================================================================================================================
-
 #include <G4_ActsGeom.C>
 #include <G4_Global.C>
 #include <G4_Magnet.C>
@@ -55,6 +54,7 @@ R__LOAD_LIBRARY(libTrackingDiagnostics.so)
 R__LOAD_LIBRARY(libtrackingqa.so)
 
 // Utility to read filelists
+
 std::string getFileFromList(const std::string& listfile, int segment)
 {
   std::ifstream file(listfile);
@@ -102,11 +102,17 @@ std::vector<std::string> getTrackFilesForCaloSegment(const std::string& tracklis
   return track_files;
 }
 
-void Fun4All_JetAna_Data(const int nEvents = -1,
+void Fun4All_JetAna_Data(const int nEvents = 500,
                          const int calo_segment = 0,
                          const std::string &filelistcalo = "calo_filelist_run_53877.txt",
                          const std::string &filelisttracks = "track_filelist_run_53877.txt")
 {
+  
+  Fun4AllServer *se = Fun4AllServer::instance();
+  int verbosity = 0;	
+	
+	
+
   // Read calo file
   std::string inputCaloFile = getFileFromList(filelistcalo, calo_segment);
   
@@ -123,7 +129,7 @@ void Fun4All_JetAna_Data(const int nEvents = -1,
 
   std::pair<int, int> runseg = Fun4AllUtils::GetRunSegment(inputCaloFile);
   int runnumber = runseg.first;
-  int segnum = runseg.second;
+  int segment = runseg.second;
 
   std::cout << "=== Job Configuration ===" << std::endl;
   std::cout << "Calo Segment: " << calo_segment << std::endl;
@@ -134,60 +140,19 @@ void Fun4All_JetAna_Data(const int nEvents = -1,
     std::cout << "  Track file " << i << ": " << inputTrackFiles[i] << std::endl;
   }
 
+
+
+  
   // Output filename
   std::string outfilename = Form("/sphenix/u/jackhedin/rtrk_project/myDataRtrk/macro/output_data/R_Tracks_Data_run%d_calo_seg_%05d.root", runnumber, calo_segment);
   std::cout << "Output file: " << outfilename << std::endl;
-
-  // === Setup Fun4All ===
-  auto se = Fun4AllServer::instance();
-  se->Verbosity(1);
-
+ 
   Enable::MVTX_APPLYMISALIGNMENT = true;
   ACTSGEOM::mvtx_applymisalignment = Enable::MVTX_APPLYMISALIGNMENT;
-  
-  //doesnt exist anymore??
-  //TRACKING::pp_mode = true;
-
+ 
   auto rc = recoConsts::instance();
   rc->set_IntFlag("RUNNUMBER", runnumber);
-  rc->set_IntFlag("RUNSEGMENT", segnum);
-
-
-
-
-
-  //  Register inputs BEFORE geometry 
-  
-  // Register one track file
-  //auto trackin = new Fun4AllDstInputManager("TrackInManager_0");
-  //trackin->fileopen(inputTrackFiles[0]);
-  //se->registerInputManager(trackin);
-
-  // Register ALL track files
-  /*for (size_t i = 0; i < inputTrackFiles.size(); i++)
-  {
-    auto trackin = new Fun4AllDstInputManager(Form("TrackInManager_%zu", i));
-    trackin->AddFile(inputTrackFiles[i]);
-    se->registerInputManager(trackin);
-    std::cout << "Registered track file " << i << ": " << inputTrackFiles[i] << std::endl;
-  }*/
-
-  /*for (size_t i = 0; i < inputTrackFiles.size(); i++)
-  {
-    auto trackin = new Fun4AllDstInputManager(Form("TrackInManager_%zu", i));
-    trackin->fileopen(inputTrackFiles[i]);  // Use fileopen() instead of AddFile()
-    se->registerInputManager(trackin);
-    std::cout << "Registered track file " << i << ": " << inputTrackFiles[i] << std::endl;
-  }*/
-
-  // Register calo file
-  /*auto caloin = new Fun4AllDstInputManager("CaloInManager");
-  caloin->fileopen(inputCaloFile);  
-  se->registerInputManager(caloin);
-  std::cout << "Registered calo file: " << inputCaloFile << std::endl;*/
-
-
-
+  rc->set_IntFlag("RUNSEGMENT", segment);
 
 
   // Create ONE input manager for all track files
@@ -205,15 +170,20 @@ void Fun4All_JetAna_Data(const int nEvents = -1,
   se->registerInputManager(caloin);
   std::cout << "Registered calo file: " << inputCaloFile << std::endl;
 
-
   std::cout << "=== Track and Calo Files register setup complete ===" << std::endl;
 
   // === NOW load geometry ===
   Enable::CDB = true;
-  rc->set_StringFlag("CDB_GLOBALTAG", "2024p023");
+  rc->set_StringFlag("CDB_GLOBALTAG", "newcdbtag");
   rc->set_uint64Flag("TIMESTAMP", runnumber);
+ 
+ 
+  std::cout << "************************LOOK HERE*****************************" << std::endl;
   std::string geofile = CDBInterface::instance()->getUrl("Tracking_Geometry");
   std::cout << "Geometry file from CDB: " << geofile << std::endl;
+  
+  
+
   Fun4AllRunNodeInputManager *ingeo = new Fun4AllRunNodeInputManager("GeoIn");
   ingeo->AddFile(geofile);
   se->registerInputManager(ingeo);
@@ -221,30 +191,35 @@ void Fun4All_JetAna_Data(const int nEvents = -1,
   TpcReadoutInit(runnumber);
 
   // === Initialize tracking ===
+
   TrackingInit();
+
+
   Global_Reco();
 
+  
   // === Calo Geometry Mapping - MUST come before calo reconstruction ===
   CaloGeomMapping *cgm = new CaloGeomMapping("CEMC_DETAILED");
   cgm->set_detector_name("CEMC");
   cgm->set_UseDetailedGeometry(true);
   se->registerSubsystem(cgm);
 
+
   // === Calo Calibration ===
   Process_Calo_Calib();
   std::cout << "Calo calib run" << std::endl;
-
+  
   // === Track projection - NOW it should find the geometry ===
   auto projection = new PHActsTrackProjection("CaloProjection");
   se->registerSubsystem(projection);
 
   std::cout << "=== Geometry and Calibrations registered and complete ===" << std::endl;
-  
+  /*  
   // === Jet Reconstruction ===
-  /*Enable::HIJETS = true;
+  Enable::HIJETS = true;
   Enable::HIJETS_MC = false;
   Enable::HIJETS_TRUTH = false;
-  HIJetReco();*/
+  HIJetReco(); */ 
   Enable::NSJETS = true;
   Enable::NSJETS_TOWER = true;
   Enable::NSJETS_MC = false;
@@ -253,16 +228,25 @@ void Fun4All_JetAna_Data(const int nEvents = -1,
   
   std::cout << "=== Jet Reconstruction complete ===" << std::endl;
 
+
+
+
+
   // === Your analysis module ===
   datartrk *ana = new datartrk("AntiKt_Tower_r04", outfilename.c_str());
   se->registerSubsystem(ana);
   std::cout << "Registered my module" << std::endl;
+  
 
   // === Run ===
-  se->run(1);
+  std::cout << "Reday to run event! :3" << std::endl;
+  se->run(nEvents);
+  
+  std::cout << "After events ran :3" << std::endl;
   se->End();
+  std::cout << "After end() :3" << std::endl;
   se->PrintTimer();
 
   std::cout << "Finished Data Rtrk analysis for calo segment " << calo_segment << std::endl;
-  //gSystem->Exit(0);
+  gSystem->Exit(0);
 }

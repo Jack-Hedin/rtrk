@@ -1,0 +1,1 @@
+So Im picking this project up from Aahana, the two origin files are literally directly pulled from her directory, Im not going to touch those, its only for reference, the ones I have made are the mySomething directories. I will probably try to combine them so I have one that can handle simulations and real data, but until then they shall be two seperated directories. 
